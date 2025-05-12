@@ -1,1 +1,48 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+from pymatgen.core import Structure, Molecule 
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--lxyz', type=float, default=15.0)
+
+    args = parser.parse_args()
+    lx = ly = lz = args.lxyz
+    print("lx = {lx}, ly = {ly}, lz = {lz}".format(lx=lx, ly=ly, lz=lz))
+
+    st = Structure.from_file("POSCAR_H2O")
+    mol = Molecule.from_sites(st.sites)
+
+    for iat in range(mol.num_sites):
+        s = mol.species[iat].symbol
+        if s in 'H':
+            mol[iat] = 'In'
+
+    bond_target = 2.0
+    bond_current = 0.969  # H2O
+
+    scale = bond_target / bond_current
+    print("scale = ", scale)
+    mol = scale_mol(mol, scale)
+
+    poscarfile = "POSCAR_In2O"
+    st = mol.get_boxed_structure(lx,ly,lz)
+    st.to(fmt='poscar', filename=poscarfile)
+   
+
+def scale_mol(mol, scale, lx=30.0, ly=30.0, lz=30.0):
+    st = mol.get_boxed_structure(lx,ly,lz)
+    new_frac_coords = st.frac_coords * scale
+
+    for iat in range(len(st)):
+        st[iat] = st[iat].specie, new_frac_coords[iat]
+
+    mol_ext = Molecule.from_sites(st.sites)
+    return mol_ext
+
+
+if __name__ == "__main__":
+    main()
 
