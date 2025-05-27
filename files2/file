@@ -1,6 +1,65 @@
-incar_settings:
-  LDAU: True
-  LDAUTYPE: 2
-  LDAUL: {"In": 2, "Ga": 2, "Zn": 2, "O": -1}
-  LDAUU: {"In": 7, "Ga": 8, "Zn": 8, "O": 0}
-  LDAUJ: {"In": 0, "Ga": 0, "Zn": 0, "O": 0}
+#!/usr/bin/env python3
+
+import sys
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+T_ox = 5.0  # nm
+#dz = 0.1  # nm
+dz = 1.0
+#dz = 10.0
+print(f"T_ox={T_ox}, dz={dz}")
+
+def calc_thickness(theta_rad):
+# T_depo = T_ox + T_etch * cos_theta
+# T_etch = T_depo + dz
+    T_depo = (T_ox*np.sin(theta_rad) + dz*np.cos(theta_rad)) \
+        /(1.0 - np.cos(theta_rad))
+    T_etch = (T_ox*np.sin(theta_rad) + dz) \
+        /(1.0 - np.cos(theta_rad))
+    return T_depo, T_etch
+
+def calc_thickness_approx(theta_rad):
+# T_depo = T_ox + (T_ox + dz) * cos_theta
+# T_etch = T_ox + dz
+    T_depo = T_ox + (T_ox + dz) * np.cos(theta_rad)
+    T_etch = T_ox + dz
+    return T_depo, T_etch
+
+theta = np.arange(80, 91, 1)  # degree
+T_depo = [calc_thickness(np.deg2rad(theta_deg))[0] \
+          for theta_deg in theta]
+T_etch = [calc_thickness(np.deg2rad(theta_deg))[1] \
+          for theta_deg in theta]
+
+T_depo_approx = [calc_thickness_approx(np.deg2rad(theta_deg))[0] \
+                 for theta_deg in theta]
+T_etch_approx = [calc_thickness_approx(np.deg2rad(theta_deg))[1] \
+                 for theta_deg in theta]
+
+##############################################################3
+# Plot T_ox, T_etch
+fig: plt.Figure
+ax: plt.Axes
+fig, ax = plt.subplots(1, 1)
+
+# Axis Settings
+plt.tick_params(labelsize=16)
+#plt.legend(fontsize=18)
+#ax.set_xlim(0,2)
+#ax.set_yscale("log")
+#ax.set_yticks([10**i for i in range(-15, 0)])
+#ax.set_ylim(ID0, ID1)
+ax.grid(True)
+ax.set_xlabel("Theta [deg]", fontsize=18)
+ax.set_ylabel("Thickness [nm]", fontsize=18)
+
+# Plot
+ax.plot(theta, T_depo, '-', label="T_depo")
+ax.plot(theta, T_etch, '-', label="T_etch")
+ax.plot(theta, T_depo_approx, '-', label="T_depo_approx")
+ax.plot(theta, T_etch_approx, '-', label="T_etch_approx")
+plt.legend(loc='best')
+plt.tight_layout()
+plt.show()
