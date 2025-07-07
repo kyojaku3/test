@@ -1,1 +1,92 @@
+#!/usr/bin/env python3
 
+import argparse
+from collections import defaultdict
+
+def read_groups(poscar_path):
+    """
+    POSCARをテキスト読み込みし、
+    6行目のspeciesリストと7行目のcountリストを返す
+    （空行は無視）。
+    """
+    with open(poscar_path) as f:
+        lines = [l.strip() for l in f if l.strip()]
+    species = lines[5].split()
+    counts  = list(map(int, lines[6].split()))
+    return species, counts
+
+def get_inserted_indices(host_poscar, new_poscar):
+    """
+    ホストPOSCARと新規POSCARを比較し、
+    挿入されたサイトの0始まりインデックスを返す。
+    """
+    # ヘッダのspecies/countを取得
+    h_s, h_c = read_groups(host_poscar)
+    n_s, n_c = read_groups(new_poscar)
+    print(f"h_s={h_s}, h_c={h_c}")
+    print(f"n_s={n_s}, n_c={n_c}")
+
+    # ホスト各グループのインデックスリスト
+    host_grp = defaultdict(list)
+    for idx, sp in enumerate(h_s):
+        host_grp[sp].append(idx)
+    print(f"host_grp={host_grp}")
+
+    # グループ消費管理用
+    host_used = defaultdict(int)   
+
+    inserted = []
+    cursor = 0  # 座標部のオフセット（0始まり）
+
+    # 新規POSCARの各グループを順に処理
+    for sp, new_cnt in zip(n_s, n_c):
+        used = host_used[sp]
+        print(sp, new_cnt, used)
+        if used < len(host_grp[sp]):
+            grp_idx = host_grp[sp][used]
+            host_cnt = h_c[grp_idx]
+            host_used[sp] += 1
+        else:
+            host_cnt = 0
+
+        ins_n = new_cnt - host_cnt
+        if ins_n > 0:
+            start = cursor + host_cnt
+            end   = cursor + new_cnt
+            inserted.extend(range(start, end))
+            print((start, end))
+
+        cursor += new_cnt
+        print(host_cnt, ins_n, cursor)
+    return inserted
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="ホストPOSCARと新規POSCARを比較し、挿入サイトのインデックスを出力"
+    )
+    parser.add_argument("host_poscar", help="ホスト構造のPOSCARファイルパス")
+    parser.add_argument("new_poscar", help="分子挿入後のPOSCARファイルパス")
+    parser.add_argument('-t', '--trajectory', type=str)
+    args = parser.parse_args()
+
+    indices = get_inserted_indices(args.host_poscar, args.new_poscar)
+    print("挿入分子のサイトIndex (0始まり)：", indices)
+
+    if args.trajectory is not None:
+        from replace_atoms import apply_replacement_to_atoms_list
+        from ase.io import read
+        from ase.visualize import view
+
+        orig_atoms_list = read(args.trajectory, index=':')
+        indices_to_replace = {idx: orig_atoms_list[0][idx].symbol for idx in indices}
+        new_atoms_list = apply_replacement_to_atoms_list(orig_atoms_list, indices_to_replace)
+
+#        print("\n--- 変更後のPOSCARの内容確認 ---")
+#        print(new_atoms_list[0].get_chemical_symbols())
+#        print(new_atoms_list[0].get_atomic_numbers())
+
+        view(new_atoms_list)
+
+
+if __name__ == "__main__":
+    main()
