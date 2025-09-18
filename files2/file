@@ -1,1 +1,55 @@
 
+# Alias
+Set-Alias touch New-Item
+Set-Alias which where.exe
+#Set-Alias emacs "C:\usr\emacs-25.2\bin\runemacs.exe"
+#Set-Alias emacs "C:\usr\emacs-27.2\bin\runemacs.exe"
+Set-Alias emacs "C:\usr\emacs-28.2\bin\runemacs.exe"
+Set-Alias spdf "C:\Users\tsukagoshi\AppData\Local\SumatraPDF\SumatraPDF.exe"
+
+# Path
+$env:Path="C:\dviout3190-inst;"+$env:Path
+$env:Path="C:\gs\gs10.00.0\bin;"+$env:Path
+$env:Path="C:\gs\gs10.00.0\lib;"+$env:Path
+
+$env:Path+=";C:\Program Files (x86)\Vim\vim90"
+$env:Path+=";C:\texlive\2022\tlpkg\tlgs\bin"
+$env:Path+=";C:\texlive\2022\tlpkg\tlgs\lib"
+$env:Path+=";C:\Users\tsukagoshi\AppData\Local\SumatraPDF"
+$env:Path+=";C:\usr\gnuplot-5.2.6\bin"
+
+# X11
+$env:DISPLAY="localhost:0.0"
+
+# Emacs-like keybind
+# https://hnakamur.github.io/blog/2020/02/22/powershell-emacs-like-keybindings/
+Import-Module PSReadLine
+Set-PSReadlineOption -EditMode Emacs
+Set-PSReadLineKeyHandler -Key Ctrl+d -Function DeleteChar
+
+# ls
+remove-item alias:ls
+function ls() {Get-ChildItem $args | Format-Wide -Column 4}
+
+# open directory with explorer 
+function open($d) {explorer $d}
+
+# propt color
+# https://qiita.com/smicle/items/0ca4e6ae14ea92000d18
+function prompt {
+  $isRoot = (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+  $color  = if ($isRoot) {"Red"} else {"Green"}
+  $marker = if ($isRoot) {"#"}   else {"$"}
+
+  Write-Host "$env:USERNAME " -ForegroundColor $color -NoNewline
+#  Write-Host "$pwd " -ForegroundColor Magenta -NoNewline
+  ### display current directory on prompt ###
+  ### https://qiita.com/subesubemanzyu/items/4c1823742ce9561bf5f0
+  Write-Host "$(split-path . -Leaf)" -ForegroundColor Magenta -NoNewline
+  ###
+  Write-Host $marker -ForegroundColor $color -NoNewline
+  return " "
+}
+
+# make no beep
+Set-PSReadlineOption -BellStyle None
