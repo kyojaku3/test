@@ -1,1 +1,262 @@
+" do not limit original function of vim
+set nocompatible
 
+" plugin
+set runtimepath+=~/.vim
+
+"**********************************************************
+" フォントの変更
+"**********************************************************
+
+" カラー設定
+if has('gui_running')
+  " GUI 用の設定
+  colorscheme myemacs
+
+  "半角文字の設定
+"set guifont=MS_Gothic:h13
+"set guifont=Consolas:h13
+"  set guifont=Consolas:h13:cSHIFTJIS
+"  set guifont=Courier\ 10\ Pitch\ 13
+  set guifont=Monospace\ 12
+
+"全角文字の設定
+"半角と全角でフォントを使い分ける必要がない場合は guifont だけ設定すればよい
+  "set guifontwide=MS_Gothic:h13
+  "set guifontwide=Consolas:h13
+
+endif
+
+"**********************************************************
+" 文字コード
+"**********************************************************
+
+"--------------------------------------------------
+" Vim起動時に、判別の優先度を定める設定
+"--------------------------------------------------
+" 読み込み時の文字コードの自動判別. 左側が優先される
+set fileencodings=utf-8,cp932,euc-jp,sji
+set fileformats=unix,dos,mac " 改行コードの自動判別. 左側が優先される
+
+"--------------------------------------------------
+" Vim起動時に、強制する設定
+"--------------------------------------------------
+" vimの内部文字コード（これを書くと、上記の優先度設定が無視される）
+set encoding=utf-8
+" 保存時の文字コード（設定されない場合は、encodingと同じ）
+"set fileencoding=utf-8 
+"set fileformat=unix  " ファイルのエンコーディング（改行コードの種類）
+
+
+set ambiwidth=double " □や○文字が崩れる問題を解決
+
+
+"**********************************************************
+" 画面表示の設定
+"**********************************************************
+"set title
+set notitle
+set number         " 行番号を表示する
+"set cursorline     " カーソル行の背景色を変える
+"set cursorcolumn   " カーソル位置のカラムの背景色を変える
+set cmdheight=2    " メッセージ表示欄を2行確保
+set showmatch      " 対応する括弧を強調表示
+set helpheight=999 " ヘルプを画面いっぱいに開く
+"set list           " 不可視文字を表示
+" 不可視文字の表示記号指定
+"set listchars=tab:?\ ,eol:?,extends:?,precedes:?
+set nowrap  " 行の折り返し表示をしない
+
+set formatoptions-=ro  " 改行するときに自動でコメントが続くのを無効化する
+syntax on  " 構文ごとに色分けをする
+
+set showcmd  "ステータスラインにコマンドを表示
+set laststatus=2  "ステータスラインを常に表示
+set statusline=
+set statusline+=[%{&fileformat}]  "ファイルフォーマット表示
+set statusline+=[%{has('multi_byte')&&\&fileencoding!=''?&fileencoding:&encoding}]  "文字コード表示
+set statusline+=%y  "ファイルタイプ表示
+
+set statusline+=%m  "変更のチェック表示
+set statusline+=%r  "読み込み専用かどうか表示
+set statusline+=%h  "ヘルプページなら[HELP]と表示
+set statusline+=%w  "プレビューウインドウなら[Prevew]と表示
+
+"set statusline=[%n]  "ファイルナンバー表示
+"set statusline+=%{matchstr(hostname(),'\\w\\+')}@  "ホスト名表示
+set statusline+=%<%F  "ファイル名表示
+
+"**********************************************************
+" カーソル移動関連の設定
+"**********************************************************
+set backspace=indent,eol,start "バックスペースキーで行頭を削除する
+set whichwrap=b,s,h,l,<,>,[,]  " 行頭行末の左右移動で行をまたぐ
+"set scrolloff=8                " 上下8行の視界を確保
+set scrolloff=1                " 上下1行の視界を確保
+"set sidescrolloff=16           " 左右スクロール時の視界を確保
+set sidescrolloff=8           " 左右スクロール時の視界を確保
+set sidescroll=1               " 左右スクロールは一文字づつ行う
+
+"**********************************************************
+" ファイル処理関連の設定
+"**********************************************************
+set confirm    " 保存されていないファイルがあるときは終了前に保存確認
+set hidden     " 保存されていないファイルがあるときでも別のファイルを開くことが出来る
+set autoread   "外部でファイルに変更がされた場合は読みなおす
+set nobackup   " ファイル保存時にバックアップファイルを作らない
+"set backup
+set noswapfile " ファイル編集中にスワップファイルを作らない
+set nowritebackup  " ファイルを上書きする前にバックアップを作ることを無効化
+
+"**********************************************************
+" 検索/置換の設定
+"**********************************************************
+"set hlsearch   " 検索文字列をハイライトする
+set nohlsearch
+set incsearch  " インクリメンタルサーチを行う
+set ignorecase " 大文字と小文字を区別しない
+set smartcase  " 大文字と小文字が混在した言葉で検索を行った場合に限り、大文字と小文字を区別する
+set wrapscan   " 最後尾まで検索を終えたら次の検索で先頭に移る
+set gdefault   " 置換の時 g オプションをデフォルトで有効にする
+
+" 直近のハイライトを解除する
+"nnoremap <F3> <Esc>:noh<CR>
+"noremap! <F3> <Esc>:noh<CR>
+
+"**********************************************************
+" 動作環境との統合関連の設定
+"**********************************************************
+
+"set clipboard+=unnamed  " 無名レジスタに入るデータを、*レジスタにも入れる。
+"set clipboard=unnamed,autoselect  " ヤンクでクリップボードにコピー
+" OSのクリップボードをレジスタ指定無しで Yank, Put 出来るようにする
+set clipboard=unnamed,unnamedplus
+set mouse=a  " マウスの入力を受け付ける
+set shellslash  " Windows でもパスの区切り文字を / にする
+"set iminsert=2  " インサートモードから抜けると自動的にIMEをオフにする
+
+"**********************************************************
+" keybind for Emacs
+"********************************************************** 
+
+"----------------------------------------------------------
+" normal mode
+
+nnoremap <silent> <C-f> <Right>
+nnoremap <silent> <C-b> <Left>
+nnoremap <silent> <C-a> 0
+nnoremap <silent> <C-e> $
+nnoremap <silent> <C-v> <C-f>
+nnoremap <silent> <ESC>v <C-b>
+nnoremap <silent> <ESC>< gg
+nnoremap <silent> <ESC>> G
+
+"----------------------------------------------------------
+" command mode
+" http://cohama.hateblo.jp/entry/20130529/1369843236
+
+" 先頭に戻る
+cnoremap <C-a> <Home>
+" 一文字戻る
+cnoremap <C-b> <Left>
+" カーソルの下の文字を削除
+cnoremap <C-d> <Del>
+" 行末へ移動
+cnoremap <C-e> <End>
+" 一文字進む
+cnoremap <C-f> <Right>
+" コマンドライン履歴を一つ進む
+cnoremap <C-n> <Down>
+" コマンドライン履歴を一つ戻る
+cnoremap <C-p> <Up>
+" 前の単語へ移動
+cnoremap <M-b> <S-Left>
+" 次の単語へ移動
+cnoremap <M-f> <S-Right>
+
+"----------------------------------------------------------
+" insert mode
+
+"change insert mode
+"inoremap <silent> jj <ESC>
+"change insert mode
+inoremap <silent> <C-j> <ESC>
+" go to the head
+inoremap <silent> <ESC>< <ESC>ggi
+" go to the tail
+inoremap <silent> <ESC>> <ESC>Gi
+" undo
+inoremap <silent> <C-x>u <ESC>ui
+
+" move to left window
+inoremap <silent> <C-c><Left>  <ESC><C-w>hi
+" move to down window
+inoremap <silent> <C-c><Down>  <ESC><C-w>ji
+" move to up window
+inoremap <silent> <C-c><Up>    <ESC><C-w>ki
+" move to right window
+inoremap <silent> <C-c><Right> <ESC><C-w>li
+
+"----------------------------------------------------------
+" copy & paste
+
+" copy
+vnoremap <silent> <ESC>w yi
+" paste
+"inoremap <C-y> p
+
+"vnoremap <silent> <ESC><S-<> gg
+"vnoremap <silent> <ESC><S->> G
+
+"**********************************************************
+" Indent, Tab
+"**********************************************************
+
+set expandtab " タブ入力を複数の空白入力に置き換える
+set tabstop=2 " 画面上でタブ文字が占める幅
+set softtabstop=2 " 連続した空白に対してタブキーやバックスペースキーでカーソルが動く幅
+set noautoindent " 改行時に前の行のインデントを継続しない
+set nosmartindent " 改行時に前の行の構文をチェックし次の行のインデントを増減しない
+"set shiftwidth=2 " smartindentで増減する幅
+set shiftwidth=0 " smartindentで増減する幅
+
+"set formatoptions-=ro " 改行するときに自動でコメントが続くのを無効化する
+autocmd Filetype * set formatoptions-=ro
+
+augroup vimrc
+    autocmd FileType {fortran} setlocal indentexpr=
+    autocmd FileType {fortran} setlocal equalprg=
+    autocmd FileType {fortran} setlocal nolisp
+    autocmd FileType {fortran} setlocal indentexpr=
+    autocmd FileType {fortran} setlocal nocindent
+    autocmd FileType {fortran} setlocal nosmartindent
+    autocmd FileType {fortran} setlocal noautoindent
+augroup END
+
+
+"**********************************************************
+" Others
+"**********************************************************
+
+" cd directory automatically when searching files
+set autochdir
+
+""" コマンドラインの設定
+" コマンドラインモードでTABキーによるファイル名補完を有効にする
+"set wildmenu
+"set wildmode=full
+set wildmode=list:longest
+set history=5000 " 保存するコマンド履歴の数
+
+""" ビープの設定
+"ビープ音すべてを無効にする
+set visualbell t_vb=     
+"エラーメッセージの表示時にビープを鳴らさない
+set noerrorbells         
+
+"""起動時のウィンドウサイズ設定
+" 列数、行数
+set columns=60
+set lines=22
+" 表示位置 (X, Y)
+winpos 100 50
