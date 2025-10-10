@@ -1,1 +1,250 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import argparse
+import time
+
+# --- 引数の定義 ---
+parser = argparse.ArgumentParser(description="1D TDS Simulation")
+parser.add_argument('--L', type=float, default=100e-7, help='膜厚 [cm]')
+parser.add_argument('--Ct0', type=float, default=1e22, help='初期トラップ濃度 [atoms/cm^3]')
+parser.add_argument('--Ed', type=float, default=1.5, help='脱離エネルギー [eV]')
+parser.add_argument('--Ea', type=float, default=0.45, help='拡散活性化エネルギー [eV]')
+parser.add_argument('--nu0', type=float, default=1e13, help='試行頻度 [1/s]')
+parser.add_argument('--D0', type=float, default=1e-4, help='拡散定数 [cm^2/s]')
+parser.add_argument('--T0', type=float, default=300.0, help='初期温度 [K]')
+parser.add_argument('--T_final', type=float, default=1200.0, help='最終温度 [K]')
+parser.add_argument('--beta', type=float, default=1.0, help='昇温速度 [K/s]')
+parser.add_argument('--Nx', type=int, default=101, help='空間分割数')
+parser.add_argument('-pf', '--plot_flux', action='store_true')
+parser.add_argument('-pp', '--plot_press', action='store_true')
+parser.add_argument('-pcs', '--plot_cs', action='store_true')
+parser.add_argument('-pct', '--plot_ct', action='store_true')
+### For isothermal simulation
+parser.add_argument('-m', '--mode', type=str, default='tds', choices=['tds','iso'])
+parser.add_argument('--time_total', type=float, default=1e-4, help='総シミュレーション時間 [s]')
+parser.add_argument('--dt', type=float, default=1e-8, help='time step [s]')
+parser.add_argument('-pi', '--plot_indices', type=int, nargs='+')
+parser.add_argument('--trap_width', type=float, default=10e-7, help='初期トラップ領域の半分の幅 [cm] (中央から)')
+
+args = parser.parse_args()
+
+# --- 1. 物理パラメータ ---
+L      = args.L
+Ct0    = args.Ct0
+Ed     = args.Ed
+Ea     = args.Ea
+nu0    = args.nu0
+D0     = args.D0
+T0     = args.T0
+T_final= args.T_final
+beta   = args.beta
+Nx     = args.Nx
+mode   = args.mode
+time_total = args.time_total 
+dt     = args.dt
+trap_width = args.trap_width
+
+kB     = 8.617333262145e-5  # Boltzmann 定数 [eV/K]
+
+# --- 2. 数値設定 ---
+Nx     = 101
+dx     = L / (Nx - 1)
+x = np.linspace(0, L, Nx)
+
+if mode == "tds":
+    dT      = 0.5
+    n_steps = int((T_final - T0) / dT)
+    dT      = (T_final - T0) / n_steps
+    dt      = dT / beta
+    Cs  = np.zeros(Nx)
+    Ct  = np.full(Nx, Ct0)
+
+elif mode == "iso":
+    dT = 0.0
+    n_steps = int(time_total / dt)
+    Cs = np.zeros(Nx)
+    Ct = np.zeros(Nx)
+    # 中央の範囲に初期トラップ濃度を設定
+    center = L / 2
+    # NumPyを使って中央の領域のインデックスを決定
+    trap_start_idx = np.argmin(np.abs(x - (center - trap_width)))
+    trap_end_idx = np.argmin(np.abs(x - (center + trap_width))) + 1
+    Ct[trap_start_idx:trap_end_idx] = Ct0
+
+Cs_old, Ct_old = Cs.copy(), Ct.copy()
+
+T_list    = [T0]
+t_list    = [0.0]
+flux_list = [0.0]
+
+print("シミュレーション開始")
+print(f"ステップ数: {n_steps}, ΔT: {dT:.3f} K, dt: {dt:.3e} s")
+
+start_time = time.time()
+
+def solve_tridiagonal(a, b, c, d):
+    n = len(b)
+    cp = np.empty(n-1)
+    dp = np.empty(n)
+    cp[0] = c[0] / b[0]
+    dp[0] = d[0] / b[0]
+    for i in range(1, n-1):
+        denom = b[i] - a[i-1] * cp[i-1]
+        cp[i] = c[i] / denom
+        dp[i] = (d[i] - a[i-1] * dp[i-1]) / denom
+    dp[-1] = (d[-1] - a[-1] * dp[-2]) / (b[-1] - a[-1] * cp[-2])
+
+    x = np.empty(n)
+    x[-1] = dp[-1]
+    for i in reversed(range(n-1)):
+        x[i] = dp[i] - cp[i] * x[i+1]
+    return x
+
+# --- 3. 温度ステップループ ---
+if args.plot_indices:
+    plot_indices = args.plot_indices
+    plot_points = len(plot_indices)
+else:
+    plot_points = 11 # プロット履歴に残す点の数
+    plot_indices = np.linspace(0, n_steps, plot_points, dtype=int)
+print(n_steps)
+print(plot_indices); #sys.exit()
+Cs_history_plot = []
+Ct_history_plot = []
+
+for step in range(0, n_steps+1):
+    current_time = step * dt
+    if mode == "tds":
+        T = T0 + step*dT
+    elif mode == "iso":
+        T = T0
+
+    D  = D0 * np.exp(-Ea / (kB*T))
+    kd = nu0 * np.exp(-Ed / (kB*T))
+
+    # (A) トラップ濃度の更新
+    Ct_new = Ct_old * np.exp(-kd * dt)
+
+    # (B) ソース項の平均化（Crank–Nicolson形式）
+    S_n    = kd * Ct_old
+    S_np1  = kd * Ct_new
+    source_term = 0.5 * dt * (S_n + S_np1)
+
+    # (C) 拡散を陰解法で
+    r = D * dt / dx**2
+    N_int = Nx - 2
+    b = np.full(N_int, 1 + 2*r)
+    a = np.full(N_int-1, -r)
+    c = np.full(N_int-1, -r)
+
+    d = Cs_old[1:-1] + source_term[1:-1]
+    Cs_int = solve_tridiagonal(a, b, c, d)
+
+    Cs[1:-1] = Cs_int
+    Cs[0] = Cs[-1] = 0.0  # 境界条件
+
+    Cs_old = Cs.copy()
+    Ct_old = Ct_new.copy()
+
+    # (D) フラックス計算
+    flux_L =  D*(Cs[1]-Cs[0])   / dx
+    flux_R =  D*(Cs[-2]-Cs[-1]) / dx
+    flux = flux_L + flux_R
+
+    T_list.append(T)
+    t_list.append(current_time)
+    flux_list.append(flux)
+
+    if step in plot_indices:
+#        print(f"step = {step}")
+#        print(current_time)
+        Cs_history_plot.append(Cs.copy())
+        Ct_history_plot.append(Ct_new.copy())
+
+    if step % 100 == 0 or step==n_steps:
+        pct = 100*step/n_steps
+        elapsed = time.time() - start_time
+        print(f"\r{pct:5.1f}% 経過時間 {elapsed:.1f}s", end="")
+
+# 最後に最終プロファイルを保存
+#Cs_history_plot.append(Cs.copy())
+#Ct_history_plot.append(Ct_new.copy())
+
+print("\nシミュレーション完了")
+
+# --- 4. Pressure
+# 定数とチャンバー条件（仮定）
+A_sample = 1.0  # サンプル面積 [cm^2]
+S_eff = 100.0  # 有効排気速度 [cm^3/s]（仮定）
+
+# 圧力プロファイル（dyne/cm²）
+P_list = [flux * A_sample / S_eff for flux in flux_list]
+
+
+# --- 5. プロット ---
+if args.plot_flux:
+    plt.figure(figsize=(8,5))
+    if mode == "tds":
+        plt.plot(T_list, flux_list, '-', lw=2)
+        plt.xlabel("Temperature (K)", fontsize=14)
+    elif mode == "iso":
+        plt.plot(t_list, flux_list, '-', lw=2)
+        plt.xlabel("Time (s)", fontsize=14)
+    plt.ylabel("Desorption Rate\n(atoms·cm$^{-2}$·s$^{-1}$)", fontsize=14)
+    plt.title(f"1D TDS (Ed={Ed} eV, Ea={Ea} eV, β={beta} K/s)", fontsize=16)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+if args.plot_press:
+    plt.figure(figsize=(8,5))
+    if mode == "tds":
+        plt.plot(T_list, P_list, '-', lw=2)
+        plt.xlabel("Temperature (K)", fontsize=14)
+    elif mode == "iso":
+        plt.plot(t_list, P_list, '-', lw=2)
+        plt.xlabel("Time (s)", fontsize=14)
+    plt.ylabel("Pressure (dyne/cm$^2$)", fontsize=14)
+    plt.title("Simulated TDS Pressure Signal", fontsize=16)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+if args.plot_cs or args.plot_ct:
+    plt.figure(figsize=(8, 6))
+    t_history = [step * dt for step in plot_indices]
+    print(t_history)
+    for i, t in enumerate(t_history):
+        label = f'{t:.2e} s'
+        if i == 0: label = 'Initial'
+        if args.plot_cs: plt.plot(x * 1e7, Cs_history_plot[i], 'o-', markersize=3, lw=1, label=label)
+        if args.plot_ct: plt.plot(x * 1e7, Ct_history_plot[i], 'o-', markersize=3, lw=1, label=label)
+    plt.xlabel('Position (nm)')
+    plt.ylabel('Concentration (cm$^{-3}$)')
+    plt.legend(title='Annealing Time')
+    plt.grid(True, which='both', linestyle='--')
+    min_C=5e21
+    plt.ylim(bottom=min_C)
+    plt.yscale('log')
+    plt.title('1D TDS Simulation')
+    plt.tight_layout()
+    plt.show()
+
+np.savetxt("tds1d.dat", list(zip(T_list, flux_list)))
+
+t_history = [step * dt for step in plot_indices]
+with open("conc.dat", 'w') as fo:
+    for i, t in enumerate(t_history):
+        Cs = Cs_history_plot[i]
+        Ct = Ct_history_plot[i]
+        fo.write(f"# t = {t:.2e} s\n")
+        for j in range(len(x)):
+            line = f"{x[j] * 1e7:.6e} {Cs[j]:.6e} {Ct[j]:.6e}\n"
+            fo.write(line)
+        fo.write("\n") 
+        fo.write("\n") 
 
