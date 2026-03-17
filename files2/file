@@ -1,1 +1,58 @@
 
+OQMDからZnO, Al2O3, Ga2O3, In2O3の構造を取得
+$ mkdir POSCAR_ZnO-AGI/
+$ ./getposcar_ZnO-AGI.sh 
+
+Primitive cell格子定数の最適化
+$ ./vc-relax_bulk.sh -d work_bulk -n 6
+
+VASP outputから格子定数を抽出して、conventional cellに変換
+$ cp prim2conv.py post_vcrelax_bulk.sh work_bulk
+$ (cd work_bulk; ./post_vcrelax_bulk.sh)
+$ ls work_bulk/POSCAR_vc-relax/
+POSCAR_ZnO_wz_conventional_41690  POSCAR_ZnO_wz_primitive_41690
+
+スーパーセルの作成
+$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c222 -f -e 'atoms.__imul__((2,2,2))'
+$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c333 -f -e 'atoms.__imul__((3,3,3))'
+$ ase gui work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c*
+$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c443 -f -e 'atoms.__imul__((4,4,3))'
+
+ドーピング、Voの構造作成
+$ ./mkdope.sh c222 0.1
+$ ./mkdope.sh c333 0.1
+$ ./mkdope.sh c443 0.1
+
+内部構造最適化
+$ ./relax_dope.sh -d work_c222_r0.1 -n 6 -c c222 -r 0.1
+
+全エネルギーを抽出
+$ ./post_dope.sh -d work_c222_r0.1 -c c222
+$ cat output.txt 
+mat CPU[s] F[eV] E[eV] E0[eV]
+bulk 650.941 -144.10474486 -144.10474486 -144.10474486
+AZO 1535.537 -148.79781581 -148.79450025 -148.79615803
+AZO_Vo_near 1476.731 -138.25825945 -138.25028584 -138.25427264
+AZO_Vo_far 1491.056 -138.98275106 -138.97988102 -138.98131604
+GZO 1680.521 -146.99555477 -146.99224222 -146.99389850
+GZO_Vo_near 1595.130 -136.69688770 -136.68705095 -136.69196933
+GZO_Vo_far 1646.547 -137.17790415 -137.17540174 -137.17665294
+IZO 1542.380 -144.41948971 -144.41579454 -144.41764213
+IZO_Vo_near 1606.811 -135.17645850 -135.17001347 -135.17323599
+IZO_Vo_far 638.494 -134.67678446 -134.67437435 -134.67557941
+
+O2エネルギーの計算
+DFTはO2分子の凝集エネルギーを過大評価するので、O原子エネルギー計算値とO2の原子化エネルギー実験値を使う。
+$ ./calc_o2.sh -d work_o2 -n 4
+
+$ ./getval.sh work_o2/relax_o2_s1/OUTCAR 
+$ ./getval.sh work_o2/relax_o2/OUTCAR 
+$ ./getval.sh work_o2/scf_o/OUTCAR 
+
+分子の計算をする場合、占有数が非整数にならないようにsmearingを小さくしたほうがよい。
+(非整数の占有数では、エントロピーが非物理的な意味となるようだ。
+https://www.vasp.at/wiki/index.php/O_atom）
+O原子において、占有数を整数にするには、対称性を落とす必要がある。
+https://www.vasp.at/wiki/index.php/O_atom_spinpolarized_low_symmetry
+ISYM=0としてもよいが、cell sizeをx,y,z方向で異なるサイズにすることで、最小限の対称性を保ちつつ、正しい計算ができる。
+
