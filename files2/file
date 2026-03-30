@@ -1,58 +1,261 @@
+#!/usr/bin/env python3
 
-OQMDからZnO, Al2O3, Ga2O3, In2O3の構造を取得
-$ mkdir POSCAR_ZnO-AGI/
-$ ./getposcar_ZnO-AGI.sh 
+import sys, os
+import argparse
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.colors as mcolors
+from matplotlib.ticker import MultipleLocator
 
-Primitive cell格子定数の最適化
-$ ./vc-relax_bulk.sh -d work_bulk -n 6
+# 0. 引数定義
+parser = argparse.ArgumentParser(
+    description="グループ別ヒストグラムプロット"
+)
+parser.add_argument('-i', '--input_txt_files', type=str, nargs='+', required=True,
+    help='Value,Group の列を持つ TXT ファイルを指定')
+parser.add_argument('-v', '--value', type=str, default='e_int')
+parser.add_argument('--skip', type=int, default=0)
+parser.add_argument('-t', '--title', type=str)
+parser.add_argument('-l', '--labels', type=str, nargs='+')
+parser.add_argument('-n', '--is_normalize', action='store_true')
+parser.add_argument('-a', '--addtable', type=str, default='Outliers', 
+    choices=['Outliers', 'Min', 'Max',])
+parser.add_argument('-b', '--bins',   type=int,   default=None,
+    help='ヒストグラムのビン数（指定なしで自動）')
+parser.add_argument('-w', '--bin_width', type=float, default=None,
+    help='ヒストグラムのビン幅（指定なしで自動）')
+parser.add_argument('--boxplot', action='store_true',
+    help='ヒストグラムに箱ひげ図を重ねて表示')
+parser.add_argument('-x', '--xlim',   nargs=2,   type=float, metavar=('XMIN','XMAX'),
+    help='横軸（度数）の表示範囲')
+parser.add_argument('-y', '--ylim',   nargs=2,   type=float, metavar=('YMIN','YMAX'),
+    help='縦軸（Value）の表示範囲')
+parser.add_argument('-xt', '--xtick',  type=float, default=10,
+    help='横軸メモリの刻み幅 (default: 10)')
+parser.add_argument('-yt', '--ytick',  type=float, default=1,
+    help='縦軸メモリの刻み幅 (default: 50)')
+args = parser.parse_args()
 
-VASP outputから格子定数を抽出して、conventional cellに変換
-$ cp prim2conv.py post_vcrelax_bulk.sh work_bulk
-$ (cd work_bulk; ./post_vcrelax_bulk.sh)
-$ ls work_bulk/POSCAR_vc-relax/
-POSCAR_ZnO_wz_conventional_41690  POSCAR_ZnO_wz_primitive_41690
+# 1. データ読み込み or サンプル生成
+df_list = []
+n_read_list = []
+for idx, txt_file in enumerate(args.input_txt_files):
+    read_df = pd.read_csv(txt_file, sep='\s+', skiprows=args.skip)
+    n_read_list.append(len(read_df))
+    if args.labels:
+        read_df['Group'] = args.labels[idx]
+    else:
+        read_df['Group'] = idx + 1
+    df_list.append(read_df)
+df = pd.concat(df_list, axis=0)
+df.rename(columns={args.value: 'Value'}, inplace=True)
 
-スーパーセルの作成
-$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c222 -f -e 'atoms.__imul__((2,2,2))'
-$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c333 -f -e 'atoms.__imul__((3,3,3))'
-$ ase gui work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c*
-$ ase convert -i vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_wz_conventional_41690 -o vasp work_bulk/POSCAR_vc-relax/POSCAR_ZnO_c443 -f -e 'atoms.__imul__((4,4,3))'
+df = df[pd.notnull(df['Value'])]
 
-ドーピング、Voの構造作成
-$ ./mkdope.sh c222 0.1
-$ ./mkdope.sh c333 0.1
-$ ./mkdope.sh c443 0.1
+# グループリストを取得
+groups = list(dict.fromkeys(df['Group']))
 
-内部構造最適化
-$ ./relax_dope.sh -d work_c222_r0.1 -n 6 -c c222 -r 0.1
+# 2. ビンエッジの決定（手動 or 自動）
+if args.ylim:
+    [val_min, val_max] = args.ylim
+else:
+    val_min, val_max = df['Value'].min(), df['Value'].max()
 
-全エネルギーを抽出
-$ ./post_dope.sh -d work_c222_r0.1 -c c222
-$ cat output.txt 
-mat CPU[s] F[eV] E[eV] E0[eV]
-bulk 650.941 -144.10474486 -144.10474486 -144.10474486
-AZO 1535.537 -148.79781581 -148.79450025 -148.79615803
-AZO_Vo_near 1476.731 -138.25825945 -138.25028584 -138.25427264
-AZO_Vo_far 1491.056 -138.98275106 -138.97988102 -138.98131604
-GZO 1680.521 -146.99555477 -146.99224222 -146.99389850
-GZO_Vo_near 1595.130 -136.69688770 -136.68705095 -136.69196933
-GZO_Vo_far 1646.547 -137.17790415 -137.17540174 -137.17665294
-IZO 1542.380 -144.41948971 -144.41579454 -144.41764213
-IZO_Vo_near 1606.811 -135.17645850 -135.17001347 -135.17323599
-IZO_Vo_far 638.494 -134.67678446 -134.67437435 -134.67557941
+if (args.bins is None) and (args.bin_width is None):
+    bin_edges = np.histogram_bin_edges(df['Value'], bins='auto')
+if args.bins:
+    bin_edges = np.linspace(val_min, val_max, args.bins + 1)
+if args.bin_width:
+    bin_width = 0.5
+    bin_edges = np.arange(val_min, val_max + args.bin_width, args.bin_width)
+print(f"bin_edges = {bin_edges}")
 
-O2エネルギーの計算
-DFTはO2分子の凝集エネルギーを過大評価するので、O原子エネルギー計算値とO2の原子化エネルギー実験値を使う。
-$ ./calc_o2.sh -d work_o2 -n 4
+# 3. 軸範囲の決定（手動 or 自動）
+# ── 横軸（度数）
+if args.xlim:
+    x_lim = tuple(args.xlim)
+else:
+    if args.is_normalize is None:
+        max_count = max(
+            np.histogram(df[df['Group']==g]['Value'], bins=bin_edges)[0].max()
+            for g in groups
+        )
+        x_lim = (0, max_count + 5)
+    else:
+        x_lim = (0, 1)
 
-$ ./getval.sh work_o2/relax_o2_s1/OUTCAR 
-$ ./getval.sh work_o2/relax_o2/OUTCAR 
-$ ./getval.sh work_o2/scf_o/OUTCAR 
+# ── 縦軸（Value）
+if args.ylim:
+    y_lim = (val_min, val_max)
+else:
+    y_margin = 0.05 * (val_max - val_min)
+    y_lim = (val_min - y_margin, val_max + y_margin)
 
-分子の計算をする場合、占有数が非整数にならないようにsmearingを小さくしたほうがよい。
-(非整数の占有数では、エントロピーが非物理的な意味となるようだ。
-https://www.vasp.at/wiki/index.php/O_atom）
-O原子において、占有数を整数にするには、対称性を落とす必要がある。
-https://www.vasp.at/wiki/index.php/O_atom_spinpolarized_low_symmetry
-ISYM=0としてもよいが、cell sizeをx,y,z方向で異なるサイズにすることで、最小限の対称性を保ちつつ、正しい計算ができる。
+# 4. 統計値計算関数
+def calculate_stats(series):
+    Q1, Q3 = series.quantile([0.25, 0.75])
+    IQR    = Q3 - Q1
+    lb, ub = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+    return {
+        "Count":    series.count(),
+        "Median":   series.median(),
+        "Mean":     series.mean(),
+        "StdDev":   series.std(),
+        "Outliers": series[(series < lb) | (series > ub)].count(),
+        "Min":   series.min(),
+        "Max":   series.max(),
+    }
 
+# 5. プロット描画
+#figsize = (1.5*len(groups)+4, 6.0) if len(groups) > 1 else (1.5*len(groups)+6, 6.0)
+figsize = (1.5*len(groups)+4, 6.0)
+fig, axes = plt.subplots(
+    nrows=2, ncols=len(groups),
+    figsize=figsize,
+    sharex='row',
+    sharey='row',
+    gridspec_kw={'height_ratios': [4, 1], 'wspace': 0, 'hspace': 0.2},
+    squeeze=False
+)
+if len(groups) == 1:
+    fig.subplots_adjust(left=0.2)
+# グループ数1でも [2,1] の2次元配列に変換
+axes = np.atleast_2d(axes)
+
+if args.title:
+    fig.suptitle(args.title)
+
+for idx, g in enumerate(groups):
+    vals    = df[df['Group'] == g]['Value']
+    ax_hist = axes[0, idx]
+    ax_tbl  = axes[1, idx]
+
+    # ヒストグラム（水平）
+    weights = np.ones(len(vals)) / len(vals) if args.is_normalize else None
+    # --- 変更: zorderを追加し、戻り値を取得 ---
+    _, _, hist_patches = ax_hist.hist(
+        vals,
+        bins=bin_edges,
+        orientation='horizontal',
+        color='sandybrown',
+        edgecolor='white',
+        alpha=0.9,
+        weights=weights,
+        zorder=1  # ヒストグラムを最背面に配置
+    )
+    ax_hist.set_title(g, fontsize=12)
+
+    # 軸範囲と目盛り
+    ax_hist.set_xlim(*x_lim)
+    ax_hist.set_ylim(*y_lim)
+    ax_hist.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+    ax_hist.yaxis.set_major_locator(MultipleLocator(args.ytick))
+
+    # --- ここから箱ひげ図の描画ブロックを追加 ---
+    if args.boxplot:
+        # 1. 統計値の計算
+        Q1 = vals.quantile(0.25)
+        median = vals.median()
+        Q3 = vals.quantile(0.75)
+        IQR = Q3 - Q1
+        whisker_low_limit = Q1 - 1.5 * IQR
+        whisker_high_limit = Q3 + 1.5 * IQR
+        # ひげの端をデータ範囲内に収める
+        whisker_low = vals[vals >= whisker_low_limit].min()
+        whisker_high = vals[vals <= whisker_high_limit].max()
+
+        # 2. 色の設定
+        hist_base_color = hist_patches[0].get_facecolor()
+        # 箱の色: ヒストグラムより薄く（透明度を低く）設定
+        box_face_color = (*mcolors.to_rgba(hist_base_color)[:3], 0.2)
+        # 枠線やひげの色: 少し濃いめの色
+        box_edge_color = (*mcolors.to_rgba(hist_base_color)[:3], 0.8)
+        # 中央値の色: 目立つように別の色を設定
+        median_color = 'firebrick'
+
+        # 3. 描画範囲（度数軸）の取得
+        xlim_min, xlim_max = ax_hist.get_xlim()
+
+        # 4. 各パーツの描画 (zorderでヒストグラムより手前に表示)
+        # 箱 (Box): 四分位範囲 (IQR)
+        box = patches.Rectangle(
+            (xlim_min, Q1),
+            xlim_max - xlim_min,
+            Q3 - Q1,
+            facecolor=box_face_color,
+            edgecolor=box_edge_color,
+            linewidth=1.2,
+            zorder=2
+        )
+        ax_hist.add_patch(box)
+
+        # 中央値の線 (Median Line)
+#        ax_hist.plot(
+#            [xlim_min, xlim_max], [median, median],
+#            color=median_color,
+#            linestyle='-',
+#            linewidth=1.8,
+#            zorder=4 # 最も手前に
+#        )
+
+        # ひげとキャップの中心X座標と、キャップの幅
+        whisker_x_center = (xlim_min + xlim_max) / 2
+        cap_width = (xlim_max - xlim_min) * 0.1 # 描画範囲の10%をキャップ幅とする
+
+        # 下ひげ (Lower Whisker & Cap)
+        ax_hist.plot([whisker_x_center, whisker_x_center], [whisker_low, Q1], color=box_edge_color, linestyle='-', linewidth=1.2, zorder=3)
+        ax_hist.plot([whisker_x_center - cap_width, whisker_x_center + cap_width], [whisker_low, whisker_low], color=box_edge_color, linestyle='-', linewidth=1.2, zorder=3)
+
+        # 上ひげ (Upper Whisker & Cap)
+        ax_hist.plot([whisker_x_center, whisker_x_center], [Q3, whisker_high], color=box_edge_color, linestyle='-', linewidth=1.2, zorder=3)
+        ax_hist.plot([whisker_x_center - cap_width, whisker_x_center + cap_width], [whisker_high, whisker_high], color=box_edge_color, linestyle='-', linewidth=1.2, zorder=3)
+    # --- ここまで箱ひげ図の描画ブロック ---
+
+
+    # ライン：中央値 & 平均
+    stats = calculate_stats(vals)
+    out_file = 'stats.dat'
+    if not os.path.exists(out_file):
+        with open(out_file, 'w') as f:
+            f.write(' '.join(stats.keys()) + '\n')
+    with open(out_file, 'a') as f:
+        f.write(' '.join(str(v) for v in stats.values()) + '\n')
+
+    ax_hist.axhline(stats['Median'],
+                    color='red', linestyle='--', linewidth=1,
+                    label='Median', clip_on=True, zorder=5) # zorderを調整
+    ax_hist.axhline(stats['Mean'],
+                    color='blue', linestyle=':', linewidth=1,
+                    label='Average', clip_on=True, zorder=5) # zorderを調整
+
+    if idx == 0:
+        ax_hist.set_ylabel(args.value, fontsize=12)
+        ax_hist.legend(loc='best', fontsize=10)
+
+    # テーブル
+    ax_tbl.axis('off')
+    tbl_data = [
+#        [int(stats["Count"])],
+        [f"{stats['Count']} / {n_read_list[idx]}"],
+        [f"{stats['Median']:.2f}"],
+        [f"{stats['Mean']:.2f}"],
+        [f"{stats['StdDev']:.2f}"],
+    ]
+    if args.addtable == 'Outliers':
+        tbl_data.append([int(stats["Outliers"])])
+    else:    
+        tbl_data.append([f"{stats[args.addtable]:.2f}"])
+    tbl_kwargs = dict(cellText=tbl_data, cellLoc='center', loc='center')
+    if idx == 0:
+        tbl_kwargs['rowLabels'] = ['Count','Median','Average','StdDev',args.addtable]
+    tbl = ax_tbl.table(**tbl_kwargs)
+    tbl.auto_set_font_size(False)
+#    tbl.set_fontsize(12)
+#    tbl.scale(1, 1.8)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 1.51)
+
+fig.tight_layout(rect=[0, 0, 1, 0.93])
+plt.show()
