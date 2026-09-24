@@ -1,1 +1,41 @@
+$ git show 0028a8b:./plot_ternary.py > tmp.py
+$ mode="new"; for Ga in $(seq 1 5); do python3 tmp.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --EA_Ga2O3 4.0 --EA_ref 4.16 -m $mode; mode="add"; done
+$ mv IGZO_scaled.csv tmp.csv
+
+$ mode="new"; for Ga in $(seq 1 5); do python3 tmp.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.66 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt -m $mode; mode="add"; done
+$ mv IGZO_scaled.csv tmp2.csv
+
+$ mode="new"; for Ga in $(seq 1 5); do python3 tmp.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt -m $mode; mode="add"; done
+$ mv IGZO_scaled.csv tmp3.csv
+
+$ python3 -c 'import pandas as pd, matplotlib.pyplot as plt; fig,ax=plt.subplots(); df=pd.read_csv("tmp.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="DEZ7120"); df=pd.read_csv("tmp2.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="HEZ0911"); df=pd.read_csv("tmp3.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="HEZ600468"); plt.legend(loc="best"); plt.show()'
+
+---------------------
+$ mode="new"; for Ga in $(seq 1 5); do python3 plot_ternary.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --EA_Ga2O3 4.0 --EA_ref 4.16 --p_Ga 3.0 -m $mode; mode="add"; done
+$ python3 -c 'import pandas as pd, matplotlib.pyplot as plt; fig,ax=plt.subplots(); df=pd.read_csv("tmp.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="DEZ7120"); df=pd.read_csv("IGZO_scaled.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="nonlinear"); plt.legend(loc="best"); plt.show()'
+
+------------------------
+$ mode="new"; for Ga in $(seq 1 5); do python3 plot_ternary.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt --p_Ga 3.0 -m $mode; mode="add"; done
+$ python3 -c 'import pandas as pd, matplotlib.pyplot as plt; fig,ax=plt.subplots(); df=pd.read_csv("tmp3.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="HEZ600468"); df=pd.read_csv("IGZO_scaled.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="nonlinear"); plt.legend(loc="best"); plt.show()'
+
+------------------------------
+$ mode="new"; for Ga in $(seq 1 5); do python3 plot_ternary.py -c 2 $Ga 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt --p_Ga 1.2 --Ef_ref 2.923 -c0 2 3 1 -m $mode; mode="add"; done
+$ python3 -c 'import pandas as pd, matplotlib.pyplot as plt; fig,ax=plt.subplots(); df=pd.read_csv("tmp3.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="HEZ600468"); df=pd.read_csv("IGZO_scaled.csv"); ax.plot(df["Ga"],df["Ef_Vo"],"o-",label="nonlinear"); plt.legend(loc="best"); plt.show()'
+
+----------------------------------
+$ python3 plot_ternary.py -c 2 3 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt --mode new
+
+$ python3 plot_ternary.py -c 2 5 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt --mode add
+
+ python3 plot_ternary.py -c 2 5 1 --opt_EA 2 --Ef_Ga2O3 4.86 --Ef_ZnO 4.3797 --EA_Ga2O3 3.9 --EA_ZnO 4.1 --EA_ref 4.16 --inpfile_mu mobility_InGaO3.txt --p_Ga 1.2  --Ef_ref 2.923 -c0 2 3 1 -m add
+
+$ cat IGZO_scaled.csv 
+In,Ga,Zn,Ef_Vo,EA,mu
+2.0,3.0,1.0,2.9231916221265712,4.074285714285714,23.809523778835985
+2.0,5.0,1.0,2.968117222956056,4.026666666666666,11.111111113580243
+2.0,5.0,1.0,2.976865120007108,4.112380952380953,28.000000042311093
+
+
+-----------------
+
 
