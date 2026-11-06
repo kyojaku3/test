@@ -1,1 +1,27 @@
-python3 -c 'import pandas as pd; import matplotlib.pyplot as plt; fig,ax=plt.subplots(); df=pd.read_csv("variation/variation_detail.csv"); labels=[231,241,251]; [ax.errorbar((v:=df.loc[(df.label==l)&(df.dIn_pct==0)&(df.dGa_pct==0)&(df.dZn_pct==0),"Vth"].iat[0]),(i:=df.loc[(df.label==l)&(df.dIn_pct==0)&(df.dGa_pct==0)&(df.dZn_pct==0),"Ion"].iat[0]),xerr=[[v-df.loc[df.label==l,"Vth"].min()],[df.loc[df.label==l,"Vth"].max()-v]],yerr=[[i-df.loc[df.label==l,"Ion"].min()],[df.loc[df.label==l,"Ion"].max()-i]],fmt="o",label=l) for l in labels]; ax.legend(); ax.set_xlabel("Vth"); ax.set_ylabel("Ion"); plt.show()'
+#!/usr/bin/env python3
+
+import sys
+
+inp = sys.argv[1]
+out = inp + "_light"
+
+skip = False
+
+with open(inp, "r", errors="ignore") as fin, \
+     open(out, "w") as fout:
+
+    for line in fin:
+
+        if "onsite density matrix" in line:
+            skip = True
+            continue
+
+        if skip and "EDDAV:" in line:
+            skip = False
+            fout.write(line)
+            continue
+
+        if not skip:
+            fout.write(line)
+
+print(f"Created {out}")
